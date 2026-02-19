@@ -186,8 +186,15 @@ ${previousScript || '(none provided)'}`;
 
     async function writeToNewSheet(data) {
         return Excel.run(async (context) => {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const name = 'AI_Transform_' + timestamp;
+            const now = new Date();
+            const ts = now.getFullYear().toString().slice(2)
+                + String(now.getMonth() + 1).padStart(2, '0')
+                + String(now.getDate()).padStart(2, '0')
+                + '_'
+                + String(now.getHours()).padStart(2, '0')
+                + String(now.getMinutes()).padStart(2, '0')
+                + String(now.getSeconds()).padStart(2, '0');
+            const name = 'AI_Transform_' + ts;
             const newSheet = context.workbook.worksheets.add(name);
             const startCell = newSheet.getRange('A1');
             const outputRange = startCell.getResizedRange(data.length - 1, data[0].length - 1);
