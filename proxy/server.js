@@ -76,7 +76,9 @@ app.post('/api/test', async (req, res) => {
         const result = await callAI(provider, apiKey, model, testPrompt);
         res.json({ success: true, content: result });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, error: err.message, status: err.status || 500 });
+        const status = err.status || 500;
+        console.error(`[${new Date().toISOString()}] TEST FAILED | Provider: ${provider} | Model: ${model || 'default'} | Status: ${status} | ${err.message}`);
+        res.status(status).json({ success: false, error: err.message, status });
     }
 });
 
@@ -92,7 +94,9 @@ app.post('/api/transform', async (req, res) => {
         const content = await callAI(provider, apiKey, model, prompt);
         res.json({ success: true, content });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, error: err.message, status: err.status || 500 });
+        const status = err.status || 500;
+        console.error(`[${new Date().toISOString()}] TRANSFORM FAILED | Provider: ${provider} | Model: ${model || 'default'} | Status: ${status} | ${err.message}`);
+        res.status(status).json({ success: false, error: err.message, status });
     }
 });
 

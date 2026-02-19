@@ -20,7 +20,7 @@
             provider: localStorage.getItem('provider') || 'claude',
             apiKey: localStorage.getItem('apiKey') || '',
             model: localStorage.getItem('model') || '',
-            proxyUrl: localStorage.getItem('proxyUrl') || '',
+            proxyUrl: localStorage.getItem('proxyUrl') || 'https://proxy.excel.archtech.be',
             scriptLanguage: localStorage.getItem('scriptLanguage') || 'VBA'
         };
     }
@@ -120,6 +120,23 @@ ${previousScript || '(none provided)'}`;
         return parsed;
     }
 
+    // ── Safe response parsing ──────────────────────────────────
+    async function safeJsonParse(response) {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            // Likely an HTML error page from nginx or a misconfigured proxy URL
+            if (text.trimStart().startsWith('<')) {
+                throw new Error(
+                    `Proxy returned an error page (HTTP ${response.status}). ` +
+                    'Check that the Proxy URL is correct and the proxy service is running.'
+                );
+            }
+            throw new Error(`Unexpected response from proxy (HTTP ${response.status}).`);
+        }
+    }
+
     // ── API communication ─────────────────────────────────────
     async function apiCall(endpoint, body) {
         const settings = loadSettings();
@@ -134,7 +151,7 @@ ${previousScript || '(none provided)'}`;
             body: JSON.stringify(body)
         });
 
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         if (!data.success) {
             const status = data.status || response.status;
             if (status === 401) throw new Error('Invalid API key. Check your key in Settings.');
@@ -434,7 +451,7 @@ ${previousScript || '(none provided)'}`;
             // First check proxy health
             const healthUrl = settings.proxyUrl.replace(/\/+$/, '') + '/api/health';
             const healthResp = await fetch(healthUrl);
-            const healthData = await healthResp.json();
+            const healthData = await safeJsonParse(healthResp);
 
             if (healthData.status !== 'ok') throw new Error('Proxy health check failed.');
 
@@ -456,7 +473,7 @@ ${previousScript || '(none provided)'}`;
                 })
             });
 
-            const data = await response.json();
+            const data = await safeJsonParse(response);
             if (!data.success) {
                 throw new Error(data.error || 'Connection test failed.');
             }
