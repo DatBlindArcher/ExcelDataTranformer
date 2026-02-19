@@ -1,0 +1,11 @@
+services:
+  proxy:
+    build: ./proxy
+    container_name: excel-ai-proxy
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+      - ALLOWED_ORIGINS=https://excel.archtech.be

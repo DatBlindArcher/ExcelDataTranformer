@@ -1,0 +1,467 @@
+/* === Base Reset & Typography === */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: #333;
+    background: #ffffff;
+    line-height: 1.4;
+}
+
+body {
+    overflow-y: auto;
+    padding: 12px;
+}
+
+/* === Navigation === */
+.nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.nav-bar h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0078d4;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.nav-tab {
+    background: none;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #666;
+    transition: background 0.15s, color 0.15s;
+}
+
+.nav-tab:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.nav-tab.active {
+    background: #e8f0fe;
+    color: #0078d4;
+    font-weight: 600;
+}
+
+.gear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #666;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.gear-btn:hover {
+    background: #f0f0f0;
+}
+
+/* === Views === */
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
+/* === Sections === */
+.section {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+/* === Form Elements === */
+label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #555;
+}
+
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    color: #333;
+    transition: border-color 0.15s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 1px #0078d4;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.field-group {
+    margin-bottom: 10px;
+}
+
+.field-row {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.field-row .field-group {
+    flex: 1;
+}
+
+/* Password toggle */
+.password-wrapper {
+    position: relative;
+}
+
+.password-wrapper input {
+    padding-right: 36px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #888;
+    padding: 2px;
+}
+
+/* === Buttons === */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #0078d4;
+    color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #106ebe;
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #d0d0d0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #e4e4e4;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.btn-large {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* === Status Indicators === */
+.status {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-top: 8px;
+    display: none;
+}
+
+.status.visible {
+    display: block;
+}
+
+.status-info {
+    background: #e8f0fe;
+    color: #0078d4;
+}
+
+.status-success {
+    background: #e6f4ea;
+    color: #107c10;
+}
+
+.status-error {
+    background: #fde7e9;
+    color: #d13438;
+}
+
+.status-loading {
+    background: #e8f0fe;
+    color: #0078d4;
+}
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #0078d4;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* === Preview Tables === */
+.preview-container {
+    max-height: 200px;
+    overflow: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-top: 8px;
+    background: #fff;
+}
+
+.preview-container table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.preview-container th,
+.preview-container td {
+    padding: 4px 8px;
+    border: 1px solid #e8e8e8;
+    text-align: left;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-container th {
+    background: #f0f0f0;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.preview-container tr:nth-child(even) td {
+    background: #fafafa;
+}
+
+.preview-info {
+    font-size: 11px;
+    color: #888;
+    margin-top: 4px;
+}
+
+/* === Collapsible Section === */
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible-header .chevron {
+    font-size: 12px;
+    transition: transform 0.2s;
+    color: #888;
+}
+
+.collapsible-header .chevron.open {
+    transform: rotate(90deg);
+}
+
+.collapsible-body {
+    display: none;
+    margin-top: 8px;
+}
+
+.collapsible-body.open {
+    display: block;
+}
+
+/* === Code Block === */
+.code-block {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 8px;
+}
+
+.code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.code-header span {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+}
+
+/* === Results Section === */
+.results-section {
+    display: none;
+}
+
+.results-section.visible {
+    display: block;
+}
+
+.explanation {
+    font-size: 12px;
+    color: #555;
+    background: #f9f9f9;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #0078d4;
+    margin-bottom: 8px;
+}
+
+/* === Write Options === */
+.write-options {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+/* === Connection Test Result === */
+.test-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+.test-result.success {
+    color: #107c10;
+}
+
+.test-result.error {
+    color: #d13438;
+}
+
+/* === Empty State === */
+.empty-state {
+    text-align: center;
+    color: #999;
+    padding: 20px 12px;
+    font-size: 12px;
+}
+
+/* === Divider === */
+.divider {
+    border: none;
+    border-top: 1px solid #e8e8e8;
+    margin: 12px 0;
+}
+
+/* === Scrollbar Styling === */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a0a0a0;
+}

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel AI Transform</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <div class="nav-bar">
+        <h1>AI Transform</h1>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-view="#view-transform">Transform</button>
+            <button class="nav-tab" data-view="#view-settings">Settings</button>
+        </div>
+        <button class="gear-btn" title="Settings">&#9881;</button>
+    </div>
+
+    <!-- ============ Settings View ============ -->
+    <div id="view-settings" class="view">
+        <div class="section">
+            <div class="section-title">AI Configuration</div>
+
+            <div class="field-group">
+                <label for="settings-provider">AI Provider</label>
+                <select id="settings-provider">
+                    <option value="claude">Claude (Anthropic)</option>
+                    <option value="openai">OpenAI</option>
+                </select>
+            </div>
+
+            <div class="field-group">
+                <label for="settings-apikey">API Key</label>
+                <div class="password-wrapper">
+                    <input type="password" id="settings-apikey" placeholder="sk-..." autocomplete="off">
+                    <button class="password-toggle" id="btn-toggle-password" title="Show/hide key">&#128065;</button>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label for="settings-model">AI Model <span style="font-weight:400;color:#999">(optional override)</span></label>
+                <input type="text" id="settings-model" placeholder="claude-sonnet-4-20250514">
+            </div>
+
+            <div class="field-group">
+                <label for="settings-proxy">Proxy URL</label>
+                <input type="text" id="settings-proxy" placeholder="https://your-proxy.example.com">
+            </div>
+
+            <div class="field-group">
+                <label for="settings-script-lang">Script Language</label>
+                <select id="settings-script-lang">
+                    <option value="VBA">VBA</option>
+                    <option value="OfficeScripts">Office Scripts (TypeScript)</option>
+                </select>
+            </div>
+
+            <hr class="divider">
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btn-save-settings">Save Settings</button>
+                <button class="btn btn-secondary" id="btn-test-connection">Test Connection</button>
+                <span class="test-result" id="test-result"></span>
+            </div>
+
+            <div class="status" id="settings-status"></div>
+        </div>
+    </div>
+
+    <!-- ============ Transform View ============ -->
+    <div id="view-transform" class="view active">
+
+        <!-- Input Data -->
+        <div class="section">
+            <div class="section-title">Input Data</div>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-small" id="btn-input-selection">Use Current Selection</button>
+                <button class="btn btn-secondary btn-small" id="btn-input-sheet">Use Entire Sheet</button>
+            </div>
+            <div class="field-group" style="margin-top:8px">
+                <select id="input-sheet-select">
+                    <option value="">-- Select Sheet --</option>
+                </select>
+            </div>
+            <div class="status" id="input-status"></div>
+            <div class="preview-info" id="input-info"></div>
+            <div class="preview-container" id="input-preview">
+                <div class="empty-state">No input data captured yet</div>
+            </div>
+        </div>
+
+        <!-- Output Example -->
+        <div class="section">
+            <div class="section-title">Output Example</div>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-small" id="btn-output-selection">Use Current Selection</button>
+                <button class="btn btn-secondary btn-small" id="btn-output-sheet">Use Entire Sheet</button>
+            </div>
+            <div class="field-group" style="margin-top:8px">
+                <select id="output-sheet-select">
+                    <option value="">-- Select Sheet --</option>
+                </select>
+            </div>
+            <div class="status" id="output-status"></div>
+            <div class="preview-info" id="output-info"></div>
+            <div class="preview-container" id="output-preview">
+                <div class="empty-state">No output example captured yet</div>
+            </div>
+        </div>
+
+        <!-- Additional Context (collapsible) -->
+        <div class="section">
+            <div class="collapsible-header">
+                <span class="section-title" style="margin-bottom:0">Additional Context</span>
+                <span class="chevron">&#9654;</span>
+            </div>
+            <div class="collapsible-body">
+                <div class="field-group">
+                    <label for="rules-textarea">Ruleset / Process Description</label>
+                    <textarea id="rules-textarea" rows="3" placeholder='e.g. "Split the full name column into first name and last name, convert dates from MM/DD/YYYY to YYYY-MM-DD, remove rows where status is inactive"'></textarea>
+                </div>
+                <div class="field-group">
+                    <label for="prev-script-textarea">Previous Script</label>
+                    <textarea id="prev-script-textarea" rows="3" placeholder="Paste a previous VBA macro or Office Script here..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action -->
+        <div class="section">
+            <button class="btn btn-primary btn-large btn-full" id="btn-transform">Transform</button>
+            <div class="status" id="transform-status"></div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" id="results-section">
+            <div class="section">
+                <div class="section-title">Transformed Data</div>
+                <div class="preview-info" id="result-preview-info"></div>
+                <div class="preview-container" id="result-preview-container"></div>
+
+                <div class="write-options">
+                    <button class="btn btn-primary btn-small" id="btn-write-new-sheet">Write to New Sheet</button>
+                    <button class="btn btn-secondary btn-small" id="btn-write-selection">Write to Selection</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="explanation" id="result-explanation"></div>
+
+                <div class="code-header">
+                    <span>Generated Script</span>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary btn-small" id="btn-copy-script">Copy Script</button>
+                    </div>
+                </div>
+                <pre class="code-block" id="result-script-code"></pre>
+                <p style="font-size:11px;color:#888;margin-top:6px">
+                    <strong>VBA:</strong> Press Alt+F11 → Insert → Module → Paste the code.<br>
+                    <strong>Office Scripts:</strong> Open Automate tab → New Script → Paste the code.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
