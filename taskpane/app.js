@@ -407,12 +407,23 @@ ${previousScript || '(none provided)'}`;
     }
 
     // ── Actions ───────────────────────────────────────────────
+    function getFormSettings() {
+        return {
+            provider: $('#settings-provider').value,
+            apiKey: $('#settings-apikey').value,
+            model: $('#settings-model').value,
+            proxyUrl: $('#settings-proxy').value,
+            scriptLanguage: $('#settings-script-lang').value
+        };
+    }
+
     async function testConnection() {
         const resultEl = $('#test-result');
         resultEl.className = 'test-result';
         resultEl.textContent = 'Testing...';
 
-        const settings = loadSettings();
+        // Use current form values so the user doesn't need to save first
+        const settings = getFormSettings();
         if (!settings.proxyUrl) {
             resultEl.className = 'test-result error';
             resultEl.textContent = 'No proxy URL set.';
@@ -433,12 +444,22 @@ ${previousScript || '(none provided)'}`;
                 return;
             }
 
-            // Test AI API key
-            await apiCall('/api/test', {
-                provider: settings.provider,
-                apiKey: settings.apiKey,
-                model: getEffectiveModel(settings)
+            // Test AI API key using the proxy URL directly (not via apiCall which reads localStorage)
+            const testUrl = settings.proxyUrl.replace(/\/+$/, '') + '/api/test';
+            const response = await fetch(testUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: settings.provider,
+                    apiKey: settings.apiKey,
+                    model: getEffectiveModel(settings)
+                })
             });
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Connection test failed.');
+            }
 
             resultEl.className = 'test-result success';
             resultEl.textContent = 'Connected!';

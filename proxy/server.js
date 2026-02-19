@@ -120,7 +120,7 @@ async function callAI(provider, apiKey, model, prompt) {
         };
         body = JSON.stringify({
             model: model || 'gpt-4o',
-            max_tokens: 16384,
+            max_completion_tokens: 16384,
             messages: [{ role: 'user', content: prompt }]
         });
     } else {
