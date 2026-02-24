@@ -125,14 +125,38 @@ Respond with EXACTLY this JSON (no markdown fences, no extra text):
     }
 
     // ── AI response parsing ───────────────────────────────────
-    function parseTransformResponse(raw) {
-        // Strip markdown code fences if present
-        let cleaned = raw.trim();
-        cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
-        cleaned = cleaned.replace(/\n?```\s*$/i, '');
-        cleaned = cleaned.trim();
+    function extractJson(raw) {
+        var text = raw.trim();
 
-        const parsed = JSON.parse(cleaned);
+        // 1) Try parsing the whole string as-is (ideal case: pure JSON)
+        try { return JSON.parse(text); } catch (_) {}
+
+        // 2) Strip outer markdown code fences and try again
+        var stripped = text
+            .replace(/^```(?:json)?\s*\n?/i, '')
+            .replace(/\n?```\s*$/i, '')
+            .trim();
+        try { return JSON.parse(stripped); } catch (_) {}
+
+        // 3) Find the first { … last } in the response (AI added prose around JSON)
+        var firstBrace = text.indexOf('{');
+        var lastBrace = text.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+            var candidate = text.substring(firstBrace, lastBrace + 1);
+            try { return JSON.parse(candidate); } catch (_) {}
+        }
+
+        // 4) Extract from within markdown fences anywhere in the text
+        var fenceMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/i);
+        if (fenceMatch) {
+            try { return JSON.parse(fenceMatch[1].trim()); } catch (_) {}
+        }
+
+        throw new Error('Could not extract valid JSON from AI response.');
+    }
+
+    function parseTransformResponse(raw) {
+        var parsed = extractJson(raw);
 
         // New format: jsTransform function
         if (typeof parsed.jsTransform === 'string' && typeof parsed.script === 'string') {
@@ -568,12 +592,16 @@ Respond with EXACTLY this JSON (no markdown fences, no extra text):
             try {
                 parsed = parseTransformResponse(response.content);
             } catch (parseErr) {
-                // Show raw response on parse failure
-                showStatus(statusEl, 'error', 'Failed to parse AI response. Raw response shown below.');
+                // Show raw response on parse failure — only show the script section, not the data/write section
+                showStatus(statusEl, 'error', 'Failed to parse AI response: ' + parseErr.message);
                 $('#result-script-code').textContent = response.content;
-                resultsEl.classList.add('visible');
                 $('#result-preview-container').innerHTML = '';
+                $('#result-preview-info').textContent = '';
                 $('#result-explanation').textContent = '';
+                $('#js-transform-section').style.display = 'none';
+                $('#btn-write-new-sheet').style.display = 'none';
+                $('#btn-write-selection').style.display = 'none';
+                resultsEl.classList.add('visible');
                 return;
             }
 
@@ -623,6 +651,10 @@ Respond with EXACTLY this JSON (no markdown fences, no extra text):
             };
             state.lastJsTransform = parsed.jsTransform || null;
             state.lastExecError = null;
+
+            // Restore write buttons (may have been hidden by a previous parse error)
+            $('#btn-write-new-sheet').style.display = '';
+            $('#btn-write-selection').style.display = '';
 
             renderPreview($('#result-preview-container'), transformedData);
             $('#result-preview-info').textContent = transformedData
