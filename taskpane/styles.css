@@ -35,48 +35,6 @@ body {
     color: #0078d4;
 }
 
-.nav-tabs {
-    display: flex;
-    gap: 4px;
-}
-
-.nav-tab {
-    background: none;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    color: #666;
-    transition: background 0.15s, color 0.15s;
-}
-
-.nav-tab:hover {
-    background: #f0f0f0;
-    color: #333;
-}
-
-.nav-tab.active {
-    background: #e8f0fe;
-    color: #0078d4;
-    font-weight: 600;
-}
-
-.gear-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 18px;
-    color: #666;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: background 0.15s;
-}
-
-.gear-btn:hover {
-    background: #f0f0f0;
-}
-
 /* === Views === */
 .view {
     display: none;
@@ -151,28 +109,6 @@ textarea {
 
 .field-row .field-group {
     flex: 1;
-}
-
-/* Password toggle */
-.password-wrapper {
-    position: relative;
-}
-
-.password-wrapper input {
-    padding-right: 36px;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    color: #888;
-    padding: 2px;
 }
 
 /* === Buttons === */
@@ -415,36 +351,12 @@ textarea {
     margin-top: 8px;
 }
 
-/* === Connection Test Result === */
-.test-result {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: 8px;
-    font-size: 12px;
-}
-
-.test-result.success {
-    color: #107c10;
-}
-
-.test-result.error {
-    color: #d13438;
-}
-
 /* === Empty State === */
 .empty-state {
     text-align: center;
     color: #999;
     padding: 20px 12px;
     font-size: 12px;
-}
-
-/* === Divider === */
-.divider {
-    border: none;
-    border-top: 1px solid #e8e8e8;
-    margin: 12px 0;
 }
 
 /* === Scrollbar Styling === */

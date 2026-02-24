@@ -6,7 +6,10 @@ module.exports = {
         env: {
             NODE_ENV: 'production',
             PORT: 3100,
-            ALLOWED_ORIGINS: 'https://excel.archtech.be'
+            ALLOWED_ORIGINS: 'https://excel.archtech.be',
+            AI_PROVIDER: 'claude',
+            AI_API_KEY: '',
+            AI_MODEL: ''
         }
     }]
 };

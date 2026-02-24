@@ -12,33 +12,15 @@
         result: null       // { transformedData, script, explanation }
     };
 
-    // ── Settings helpers ──────────────────────────────────────
-    const SETTINGS_KEYS = ['provider', 'apiKey', 'model', 'proxyUrl', 'scriptLanguage'];
+    // ── Configuration ─────────────────────────────────────────
+    const PROXY_URL = 'https://proxy.excel.archtech.be';
 
-    function loadSettings() {
-        return {
-            provider: localStorage.getItem('provider') || 'claude',
-            apiKey: localStorage.getItem('apiKey') || '',
-            model: localStorage.getItem('model') || '',
-            proxyUrl: localStorage.getItem('proxyUrl') || 'https://proxy.excel.archtech.be',
-            scriptLanguage: localStorage.getItem('scriptLanguage') || 'VBA'
-        };
+    function getScriptLanguage() {
+        return localStorage.getItem('scriptLanguage') || 'VBA';
     }
 
-    function saveSettings(settings) {
-        SETTINGS_KEYS.forEach(key => {
-            if (settings[key] !== undefined) {
-                localStorage.setItem(key, settings[key]);
-            }
-        });
-    }
-
-    function getDefaultModel(provider) {
-        return provider === 'openai' ? 'gpt-4o' : 'claude-sonnet-4-20250514';
-    }
-
-    function getEffectiveModel(settings) {
-        return settings.model || getDefaultModel(settings.provider);
+    function saveScriptLanguage(value) {
+        localStorage.setItem('scriptLanguage', value);
     }
 
     // ── CSV helpers ───────────────────────────────────────────
@@ -139,12 +121,7 @@ ${previousScript || '(none provided)'}`;
 
     // ── API communication ─────────────────────────────────────
     async function apiCall(endpoint, body) {
-        const settings = loadSettings();
-
-        if (!settings.apiKey) throw new Error('No API key configured. Go to Settings to add one.');
-        if (!settings.proxyUrl) throw new Error('No proxy URL configured. Go to Settings to add one.');
-
-        const url = settings.proxyUrl.replace(/\/+$/, '') + endpoint;
+        const url = PROXY_URL + endpoint;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -154,9 +131,8 @@ ${previousScript || '(none provided)'}`;
         const data = await safeJsonParse(response);
         if (!data.success) {
             const status = data.status || response.status;
-            if (status === 401) throw new Error('Invalid API key. Check your key in Settings.');
             if (status === 429) throw new Error('Rate limited. Please wait a moment and try again.');
-            if (status >= 500) throw new Error('AI service error. Try again or switch providers.');
+            if (status >= 500) throw new Error('AI service error. Try again later.');
             throw new Error(data.error || 'Unknown error from proxy.');
         }
         return data;
@@ -236,15 +212,6 @@ ${previousScript || '(none provided)'}`;
 
     // ── UI helpers ────────────────────────────────────────────
     function $(selector) { return document.querySelector(selector); }
-    function $$(selector) { return document.querySelectorAll(selector); }
-
-    function showView(viewId) {
-        $$('.view').forEach(v => v.classList.remove('active'));
-        $(viewId).classList.add('active');
-        $$('.nav-tab').forEach(t => t.classList.remove('active'));
-        const tab = $(`.nav-tab[data-view="${viewId}"]`);
-        if (tab) tab.classList.add('active');
-    }
 
     function renderPreview(container, data) {
         if (!data || data.length === 0) {
@@ -311,21 +278,8 @@ ${previousScript || '(none provided)'}`;
     });
 
     function init() {
-        // Load settings into form
-        const settings = loadSettings();
-        $('#settings-provider').value = settings.provider;
-        $('#settings-apikey').value = settings.apiKey;
-        $('#settings-model').value = settings.model;
-        $('#settings-model').placeholder = getDefaultModel(settings.provider);
-        $('#settings-proxy').value = settings.proxyUrl;
-        $('#settings-script-lang').value = settings.scriptLanguage;
-
-        // If no API key or proxy, show settings first
-        if (!settings.apiKey || !settings.proxyUrl) {
-            showView('#view-settings');
-        } else {
-            showView('#view-transform');
-        }
+        // Load script language preference
+        $('#script-language').value = getScriptLanguage();
 
         // Load sheet names
         refreshSheetLists();
@@ -345,45 +299,10 @@ ${previousScript || '(none provided)'}`;
 
     // ── Event binding ─────────────────────────────────────────
     function bindEvents() {
-        // Navigation
-        $$('.nav-tab').forEach(tab => {
-            tab.addEventListener('click', () => showView(tab.dataset.view));
+        // Script language preference
+        $('#script-language').addEventListener('change', (e) => {
+            saveScriptLanguage(e.target.value);
         });
-        $('.gear-btn').addEventListener('click', () => showView('#view-settings'));
-
-        // Provider change updates model placeholder
-        $('#settings-provider').addEventListener('change', (e) => {
-            $('#settings-model').placeholder = getDefaultModel(e.target.value);
-        });
-
-        // Save settings
-        $('#btn-save-settings').addEventListener('click', () => {
-            saveSettings({
-                provider: $('#settings-provider').value,
-                apiKey: $('#settings-apikey').value,
-                model: $('#settings-model').value,
-                proxyUrl: $('#settings-proxy').value,
-                scriptLanguage: $('#settings-script-lang').value
-            });
-            showStatus($('#settings-status'), 'success', 'Settings saved.');
-            setTimeout(() => hideStatus($('#settings-status')), 2000);
-        });
-
-        // Password toggle
-        $('#btn-toggle-password').addEventListener('click', () => {
-            const input = $('#settings-apikey');
-            const btn = $('#btn-toggle-password');
-            if (input.type === 'password') {
-                input.type = 'text';
-                btn.textContent = '🙈';
-            } else {
-                input.type = 'password';
-                btn.textContent = '👁';
-            }
-        });
-
-        // Test connection
-        $('#btn-test-connection').addEventListener('click', testConnection);
 
         // Input data buttons
         $('#btn-input-selection').addEventListener('click', () => captureData('input', 'selection'));
@@ -424,68 +343,6 @@ ${previousScript || '(none provided)'}`;
     }
 
     // ── Actions ───────────────────────────────────────────────
-    function getFormSettings() {
-        return {
-            provider: $('#settings-provider').value,
-            apiKey: $('#settings-apikey').value,
-            model: $('#settings-model').value,
-            proxyUrl: $('#settings-proxy').value,
-            scriptLanguage: $('#settings-script-lang').value
-        };
-    }
-
-    async function testConnection() {
-        const resultEl = $('#test-result');
-        resultEl.className = 'test-result';
-        resultEl.textContent = 'Testing...';
-
-        // Use current form values so the user doesn't need to save first
-        const settings = getFormSettings();
-        if (!settings.proxyUrl) {
-            resultEl.className = 'test-result error';
-            resultEl.textContent = 'No proxy URL set.';
-            return;
-        }
-
-        try {
-            // First check proxy health
-            const healthUrl = settings.proxyUrl.replace(/\/+$/, '') + '/api/health';
-            const healthResp = await fetch(healthUrl);
-            const healthData = await safeJsonParse(healthResp);
-
-            if (healthData.status !== 'ok') throw new Error('Proxy health check failed.');
-
-            if (!settings.apiKey) {
-                resultEl.className = 'test-result success';
-                resultEl.textContent = 'Proxy OK (no API key to test)';
-                return;
-            }
-
-            // Test AI API key using the proxy URL directly (not via apiCall which reads localStorage)
-            const testUrl = settings.proxyUrl.replace(/\/+$/, '') + '/api/test';
-            const response = await fetch(testUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    provider: settings.provider,
-                    apiKey: settings.apiKey,
-                    model: getEffectiveModel(settings)
-                })
-            });
-
-            const data = await safeJsonParse(response);
-            if (!data.success) {
-                throw new Error(data.error || 'Connection test failed.');
-            }
-
-            resultEl.className = 'test-result success';
-            resultEl.textContent = 'Connected!';
-        } catch (e) {
-            resultEl.className = 'test-result error';
-            resultEl.textContent = e.message || 'Connection failed.';
-        }
-    }
-
     async function captureData(target, mode, sheetName) {
         const statusEl = target === 'input' ? $('#input-status') : $('#output-status');
         const previewEl = target === 'input' ? $('#input-preview') : $('#output-preview');
@@ -536,19 +393,10 @@ ${previousScript || '(none provided)'}`;
             return;
         }
 
-        const settings = loadSettings();
-        if (!settings.apiKey) {
-            showStatus(statusEl, 'error', 'No API key configured. Go to Settings.');
-            return;
-        }
-        if (!settings.proxyUrl) {
-            showStatus(statusEl, 'error', 'No proxy URL configured. Go to Settings.');
-            return;
-        }
-
         const rules = $('#rules-textarea').value.trim();
         const previousScript = $('#prev-script-textarea').value.trim();
-        const scriptLang = settings.scriptLanguage === 'VBA' ? 'VBA' : 'Office Scripts (TypeScript)';
+        const scriptLangValue = $('#script-language').value;
+        const scriptLang = scriptLangValue === 'VBA' ? 'VBA' : 'Office Scripts (TypeScript)';
 
         const prompt = buildPrompt(state.inputData, state.outputData, rules, previousScript, scriptLang);
 
@@ -556,12 +404,7 @@ ${previousScript || '(none provided)'}`;
         $('#btn-transform').disabled = true;
 
         try {
-            const response = await apiCall('/api/transform', {
-                provider: settings.provider,
-                apiKey: settings.apiKey,
-                model: getEffectiveModel(settings),
-                prompt: prompt
-            });
+            const response = await apiCall('/api/transform', { prompt });
 
             showStatus(statusEl, 'loading', 'Parsing response...');
 

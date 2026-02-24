@@ -11,62 +11,6 @@
     <!-- Navigation -->
     <div class="nav-bar">
         <h1>AI Transform</h1>
-        <div class="nav-tabs">
-            <button class="nav-tab active" data-view="#view-transform">Transform</button>
-            <button class="nav-tab" data-view="#view-settings">Settings</button>
-        </div>
-        <button class="gear-btn" title="Settings">&#9881;</button>
-    </div>
-
-    <!-- ============ Settings View ============ -->
-    <div id="view-settings" class="view">
-        <div class="section">
-            <div class="section-title">AI Configuration</div>
-
-            <div class="field-group">
-                <label for="settings-provider">AI Provider</label>
-                <select id="settings-provider">
-                    <option value="claude">Claude (Anthropic)</option>
-                    <option value="openai">OpenAI</option>
-                </select>
-            </div>
-
-            <div class="field-group">
-                <label for="settings-apikey">API Key</label>
-                <div class="password-wrapper">
-                    <input type="password" id="settings-apikey" placeholder="sk-..." autocomplete="off">
-                    <button class="password-toggle" id="btn-toggle-password" title="Show/hide key">&#128065;</button>
-                </div>
-            </div>
-
-            <div class="field-group">
-                <label for="settings-model">AI Model <span style="font-weight:400;color:#999">(optional override)</span></label>
-                <input type="text" id="settings-model" placeholder="claude-sonnet-4-20250514">
-            </div>
-
-            <div class="field-group">
-                <label for="settings-proxy">Proxy URL</label>
-                <input type="text" id="settings-proxy" placeholder="https://proxy.excel.archtech.be">
-            </div>
-
-            <div class="field-group">
-                <label for="settings-script-lang">Script Language</label>
-                <select id="settings-script-lang">
-                    <option value="VBA">VBA</option>
-                    <option value="OfficeScripts">Office Scripts (TypeScript)</option>
-                </select>
-            </div>
-
-            <hr class="divider">
-
-            <div class="btn-group">
-                <button class="btn btn-primary" id="btn-save-settings">Save Settings</button>
-                <button class="btn btn-secondary" id="btn-test-connection">Test Connection</button>
-                <span class="test-result" id="test-result"></span>
-            </div>
-
-            <div class="status" id="settings-status"></div>
-        </div>
     </div>
 
     <!-- ============ Transform View ============ -->
@@ -130,6 +74,13 @@
 
         <!-- Action -->
         <div class="section">
+            <div class="field-group">
+                <label for="script-language">Script Language</label>
+                <select id="script-language">
+                    <option value="VBA">VBA</option>
+                    <option value="OfficeScripts">Office Scripts (TypeScript)</option>
+                </select>
+            </div>
             <button class="btn btn-primary btn-large btn-full" id="btn-transform">Transform</button>
             <div class="status" id="transform-status"></div>
         </div>

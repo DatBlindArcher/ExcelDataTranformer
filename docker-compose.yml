@@ -9,3 +9,6 @@ services:
       - NODE_ENV=production
       - PORT=3100
       - ALLOWED_ORIGINS=https://excel.archtech.be
+      - AI_PROVIDER=${AI_PROVIDER:-claude}
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-}

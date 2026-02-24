@@ -5,6 +5,11 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3100;
 
+// AI configuration from environment
+const AI_PROVIDER = process.env.AI_PROVIDER || 'claude';
+const AI_API_KEY  = process.env.AI_API_KEY  || '';
+const AI_MODEL    = process.env.AI_MODEL    || '';
+
 // Parse allowed origins from environment variable or use defaults
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -52,9 +57,7 @@ app.use('/api/', limiter);
 app.use('/api/', (req, res, next) => {
     const timestamp = new Date().toISOString();
     const ip = req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip;
-    const provider = req.body?.provider || '-';
-    const model = req.body?.model || '-';
-    console.log(`[${timestamp}] ${req.method} ${req.path} | IP: ${ip} | Provider: ${provider} | Model: ${model}`);
+    console.log(`[${timestamp}] ${req.method} ${req.path} | IP: ${ip} | Provider: ${AI_PROVIDER} | Model: ${AI_MODEL || '(default)'}`);
     next();
 });
 
@@ -63,39 +66,41 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Test connection — sends a minimal request to the AI API
+// Test connection — sends a minimal request to the AI API using server-side config
 app.post('/api/test', async (req, res) => {
-    const { provider, apiKey, model } = req.body;
-
-    if (!provider || !apiKey) {
-        return res.status(400).json({ success: false, error: 'Missing required fields: provider, apiKey' });
+    if (!AI_API_KEY) {
+        return res.status(500).json({ success: false, error: 'AI_API_KEY is not configured on the server.' });
     }
 
     try {
         const testPrompt = 'Respond with exactly: ok';
-        const result = await callAI(provider, apiKey, model, testPrompt);
+        const result = await callAI(AI_PROVIDER, AI_API_KEY, AI_MODEL, testPrompt);
         res.json({ success: true, content: result });
     } catch (err) {
         const status = err.status || 500;
-        console.error(`[${new Date().toISOString()}] TEST FAILED | Provider: ${provider} | Model: ${model || 'default'} | Status: ${status} | ${err.message}`);
+        console.error(`[${new Date().toISOString()}] TEST FAILED | Provider: ${AI_PROVIDER} | Model: ${AI_MODEL || 'default'} | Status: ${status} | ${err.message}`);
         res.status(status).json({ success: false, error: err.message, status });
     }
 });
 
-// Transform — forwards the full prompt to the AI API
+// Transform — forwards the full prompt to the AI API using server-side config
 app.post('/api/transform', async (req, res) => {
-    const { provider, apiKey, model, prompt } = req.body;
+    const { prompt } = req.body;
 
-    if (!provider || !apiKey || !prompt) {
-        return res.status(400).json({ success: false, error: 'Missing required fields: provider, apiKey, prompt' });
+    if (!prompt) {
+        return res.status(400).json({ success: false, error: 'Missing required field: prompt' });
+    }
+
+    if (!AI_API_KEY) {
+        return res.status(500).json({ success: false, error: 'AI_API_KEY is not configured on the server.' });
     }
 
     try {
-        const content = await callAI(provider, apiKey, model, prompt);
+        const content = await callAI(AI_PROVIDER, AI_API_KEY, AI_MODEL, prompt);
         res.json({ success: true, content });
     } catch (err) {
         const status = err.status || 500;
-        console.error(`[${new Date().toISOString()}] TRANSFORM FAILED | Provider: ${provider} | Model: ${model || 'default'} | Status: ${status} | ${err.message}`);
+        console.error(`[${new Date().toISOString()}] TRANSFORM FAILED | Provider: ${AI_PROVIDER} | Model: ${AI_MODEL || 'default'} | Status: ${status} | ${err.message}`);
         res.status(status).json({ success: false, error: err.message, status });
     }
 });
@@ -162,4 +167,8 @@ async function callAI(provider, apiKey, model, prompt) {
 app.listen(PORT, () => {
     console.log(`Excel AI Proxy running on port ${PORT}`);
     console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
+    console.log(`AI Provider: ${AI_PROVIDER} | Model: ${AI_MODEL || '(default)'}`);
+    if (!AI_API_KEY) {
+        console.warn('WARNING: AI_API_KEY is not set. API calls will fail.');
+    }
 });
