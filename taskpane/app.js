@@ -224,7 +224,7 @@ Respond with EXACTLY this JSON (no markdown fences, no extra text):
     }
 
     // ── API communication ─────────────────────────────────────
-    var CLIENT_TIMEOUT_MS = 90000; // 90s — under nginx's 120s for clean errors
+    var CLIENT_TIMEOUT_MS = 280000; // 90s — under nginx's 120s for clean errors
 
     async function apiCall(endpoint, body, externalSignal) {
         var url = PROXY_URL + endpoint;
