@@ -7,9 +7,12 @@
 
     // ── State ──────────────────────────────────────────────────
     const state = {
-        inputData: null,   // 2D array
-        outputData: null,  // 2D array
-        result: null       // { transformedData, script, explanation }
+        inputData: null,       // 2D array
+        outputData: null,      // 2D array
+        result: null,          // { transformedData, jsTransform, script, explanation }
+        lastJsTransform: null, // last generated JS function source (for retry)
+        lastExecError: null,   // last local execution error message (for retry)
+        abortController: null  // AbortController for in-flight API request
     };
 
     // ── Configuration ─────────────────────────────────────────
@@ -37,43 +40,45 @@
     }
 
     // ── Prompt construction ───────────────────────────────────
-    function buildPrompt(inputData, outputExample, rules, previousScript, scriptLanguage) {
-        let inputCsv = arrayToCsv(inputData);
-        let note = '';
+    const SAMPLE_SIZE = 50;
 
-        if (inputData.length > 200) {
-            const sample = inputData.slice(0, 51); // header + 50 rows
-            inputCsv = arrayToCsv(sample);
-            note = `(Showing first 50 of ${inputData.length} rows. Apply the transformation to all rows.)`;
-        }
-
-        let outputCsv = arrayToCsv(outputExample);
+    function buildTransformPrompt(inputData, outputExample, rules, previousScript, scriptLanguage) {
+        const totalRows = inputData.length - 1; // exclude header
+        const sampleRows = inputData.slice(0, Math.min(inputData.length, SAMPLE_SIZE + 1));
+        const sampleCsv = arrayToCsv(sampleRows);
+        const showingCount = Math.min(totalRows, SAMPLE_SIZE);
+        const outputCsv = arrayToCsv(outputExample);
 
         return `You are an Excel data transformation assistant. You will be given:
-1. INPUT DATA: The raw source data from an Excel spreadsheet (as CSV).
+1. INPUT DATA: A sample of the raw source data (header + up to ${SAMPLE_SIZE} rows, as CSV).
 2. OUTPUT EXAMPLE: An example of what the transformed data should look like (as CSV).
-3. (Optional) TRANSFORMATION RULES: Additional rules or descriptions of the transformation.
+3. (Optional) TRANSFORMATION RULES: Additional rules or descriptions.
 4. (Optional) PREVIOUS SCRIPT: A previously used script for reference.
 
 Your task:
-A) Analyze the input and output example to infer the transformation logic.
-B) Apply that transformation to the FULL input data.
-C) Generate a reusable script in ${scriptLanguage} that performs this transformation.
+A) Analyze the input sample and output example to infer the transformation logic.
+B) Write a JavaScript function that implements this transformation.
+C) Generate a reusable script in ${scriptLanguage} for the user.
+
+The JavaScript function MUST follow this exact signature and contract:
+- Signature: function transform(header, rows)
+- header: a 1D array of strings (the first row / column names from the input)
+- rows: a 2D array of the remaining data rows (each row is an array of values)
+- Return value: a 2D array INCLUDING the new header as the first row
+- The function must be pure (no external dependencies, no DOM access, no fetch)
+- The function must handle edge cases: empty cells (null or ""), missing columns
+- Use only standard JavaScript (ES2017) — no import/require, no Node.js APIs
+- Cell values can be strings, numbers, booleans, or null (empty cells). Handle all types appropriately.
 
 Respond with EXACTLY this JSON structure (no markdown fences, no extra text):
 {
-  "transformedData": [
-    ["Header1", "Header2", ...],
-    ["row1col1", "row1col2", ...],
-    ...
-  ],
+  "jsTransform": "function transform(header, rows) { ... }",
   "script": "...the full ${scriptLanguage} code as a string...",
-  "explanation": "Brief explanation of the transformation logic applied."
+  "explanation": "Brief explanation of the transformation logic."
 }
 
---- INPUT DATA (CSV) ---
-${inputCsv}
-${note}
+--- INPUT DATA (CSV, ${totalRows} total data rows, showing first ${showingCount}) ---
+${sampleCsv}
 
 --- OUTPUT EXAMPLE (CSV) ---
 ${outputCsv}
@@ -85,8 +90,42 @@ ${rules || '(none provided)'}
 ${previousScript || '(none provided)'}`;
     }
 
+    function buildFixPrompt(inputData, outputExample, failedFunction, errorMessage, scriptLanguage) {
+        const sampleCsv = arrayToCsv(inputData.slice(0, Math.min(inputData.length, SAMPLE_SIZE + 1)));
+        const outputCsv = arrayToCsv(outputExample);
+
+        return `You previously generated a JavaScript transform function that failed with an error when executed locally.
+
+--- ORIGINAL INPUT DATA (CSV, sample) ---
+${sampleCsv}
+
+--- EXPECTED OUTPUT (CSV) ---
+${outputCsv}
+
+--- FAILED FUNCTION ---
+${failedFunction}
+
+--- ERROR MESSAGE ---
+${errorMessage}
+
+Please fix the function. Same requirements as before:
+- Signature: function transform(header, rows)
+- header: a 1D array of strings (the first row / column names)
+- rows: a 2D array of the remaining data rows
+- Return a 2D array INCLUDING the new header as the first row
+- Pure JavaScript (ES2017), no external dependencies
+- Cell values can be strings, numbers, booleans, or null
+
+Respond with EXACTLY this JSON (no markdown fences, no extra text):
+{
+  "jsTransform": "function transform(header, rows) { ... }",
+  "script": "...the full ${scriptLanguage} code...",
+  "explanation": "Explanation of what was fixed."
+}`;
+    }
+
     // ── AI response parsing ───────────────────────────────────
-    function parseAIResponse(raw) {
+    function parseTransformResponse(raw) {
         // Strip markdown code fences if present
         let cleaned = raw.trim();
         cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
@@ -95,11 +134,52 @@ ${previousScript || '(none provided)'}`;
 
         const parsed = JSON.parse(cleaned);
 
-        if (!Array.isArray(parsed.transformedData) || typeof parsed.script !== 'string') {
-            throw new Error('Invalid response structure: missing transformedData array or script string.');
+        // New format: jsTransform function
+        if (typeof parsed.jsTransform === 'string' && typeof parsed.script === 'string') {
+            return parsed;
         }
 
-        return parsed;
+        // Backward-compatible: AI returned old format with transformedData
+        if (Array.isArray(parsed.transformedData) && typeof parsed.script === 'string') {
+            return {
+                jsTransform: null,
+                transformedData: parsed.transformedData,
+                script: parsed.script,
+                explanation: parsed.explanation || ''
+            };
+        }
+
+        throw new Error('Invalid response structure: missing jsTransform function or script string.');
+    }
+
+    // ── Local JS execution engine ────────────────────────────
+    async function executeJsTransform(jsTransformSource, fullData) {
+        // Shallow copy to prevent AI-generated code from mutating state
+        var header = fullData[0].slice();
+        var rows = fullData.slice(1).map(function(row) { return row.slice(); });
+
+        // Create the transform function from AI-generated source
+        var factory = new Function('"use strict"; return (' + jsTransformSource + ')');
+        var transformFn = factory();
+
+        if (typeof transformFn !== 'function') {
+            throw new Error('AI did not return a valid function.');
+        }
+
+        // Yield to event loop so UI can update before heavy computation
+        await new Promise(function(resolve) { setTimeout(resolve, 0); });
+
+        var result = transformFn(header, rows);
+
+        // Validate result shape
+        if (!Array.isArray(result) || result.length === 0) {
+            throw new Error('Transform function returned empty or non-array result.');
+        }
+        if (!Array.isArray(result[0])) {
+            throw new Error('Transform function did not return a 2D array.');
+        }
+
+        return result;
     }
 
     // ── Safe response parsing ──────────────────────────────────
@@ -120,22 +200,59 @@ ${previousScript || '(none provided)'}`;
     }
 
     // ── API communication ─────────────────────────────────────
-    async function apiCall(endpoint, body) {
-        const url = PROXY_URL + endpoint;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
+    var CLIENT_TIMEOUT_MS = 90000; // 90s — under nginx's 120s for clean errors
 
-        const data = await safeJsonParse(response);
-        if (!data.success) {
-            const status = data.status || response.status;
-            if (status === 429) throw new Error('Rate limited. Please wait a moment and try again.');
-            if (status >= 500) throw new Error('AI service error. Try again later.');
-            throw new Error(data.error || 'Unknown error from proxy.');
+    async function apiCall(endpoint, body, externalSignal) {
+        var url = PROXY_URL + endpoint;
+
+        // Set up timeout + optional external abort
+        var controller = new AbortController();
+        var wasTimeout = false;
+        var timeoutId = setTimeout(function() {
+            wasTimeout = true;
+            controller.abort();
+        }, CLIENT_TIMEOUT_MS);
+
+        // If caller provided an external signal, forward its abort
+        if (externalSignal) {
+            if (externalSignal.aborted) {
+                clearTimeout(timeoutId);
+                throw new Error('Request was cancelled.');
+            }
+            externalSignal.addEventListener('abort', function() {
+                clearTimeout(timeoutId);
+                controller.abort();
+            });
         }
-        return data;
+
+        try {
+            var response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            var data = await safeJsonParse(response);
+            if (!data.success) {
+                var status = data.status || response.status;
+                if (status === 429) throw new Error('Rate limited. Please wait a moment and try again.');
+                if (status >= 500) throw new Error('AI service error. Try again later.');
+                throw new Error(data.error || 'Unknown error from proxy.');
+            }
+            return data;
+        } catch (e) {
+            clearTimeout(timeoutId);
+            if (e.name === 'AbortError') {
+                if (wasTimeout) {
+                    throw new Error('Request timed out. The AI took too long to respond.');
+                }
+                throw new Error('Request was cancelled.');
+            }
+            throw e;
+        }
     }
 
     // ── Excel helpers ─────────────────────────────────────────
@@ -327,7 +444,26 @@ ${previousScript || '(none provided)'}`;
         });
 
         // Transform
-        $('#btn-transform').addEventListener('click', runTransform);
+        $('#btn-transform').addEventListener('click', function() { runTransform(false); });
+
+        // Cancel in-flight transform
+        $('#btn-cancel-transform').addEventListener('click', function() {
+            if (state.abortController) {
+                state.abortController.abort();
+                state.abortController = null;
+            }
+        });
+
+        // Retry with AI fix after local execution failure
+        $('#btn-retry-transform').addEventListener('click', function() { runTransform(true); });
+
+        // JS transform section collapsible
+        $('#js-transform-header').addEventListener('click', function() {
+            var chevron = $('#js-transform-header .chevron');
+            var body = $('#js-transform-body');
+            chevron.classList.toggle('open');
+            body.classList.toggle('open');
+        });
 
         // Write results
         $('#btn-write-new-sheet').addEventListener('click', () => writeResults('newSheet'));
@@ -378,10 +514,11 @@ ${previousScript || '(none provided)'}`;
         }
     }
 
-    async function runTransform() {
-        const statusEl = $('#transform-status');
-        const resultsEl = $('#results-section');
+    async function runTransform(retryMode) {
+        var statusEl = $('#transform-status');
+        var resultsEl = $('#results-section');
         resultsEl.classList.remove('visible');
+        $('#btn-retry-transform').style.display = 'none';
 
         // Validate
         if (!state.inputData) {
@@ -393,24 +530,43 @@ ${previousScript || '(none provided)'}`;
             return;
         }
 
-        const rules = $('#rules-textarea').value.trim();
-        const previousScript = $('#prev-script-textarea').value.trim();
-        const scriptLangValue = $('#script-language').value;
-        const scriptLang = scriptLangValue === 'VBA' ? 'VBA' : 'Office Scripts (TypeScript)';
+        var rules = $('#rules-textarea').value.trim();
+        var previousScript = $('#prev-script-textarea').value.trim();
+        var scriptLangValue = $('#script-language').value;
+        var scriptLang = scriptLangValue === 'VBA' ? 'VBA' : 'Office Scripts (TypeScript)';
 
-        const prompt = buildPrompt(state.inputData, state.outputData, rules, previousScript, scriptLang);
+        // Build prompt: new transform or retry fix
+        var prompt;
+        if (retryMode && state.lastJsTransform && state.lastExecError) {
+            prompt = buildFixPrompt(
+                state.inputData, state.outputData,
+                state.lastJsTransform, state.lastExecError, scriptLang
+            );
+        } else {
+            prompt = buildTransformPrompt(
+                state.inputData, state.outputData, rules, previousScript, scriptLang
+            );
+        }
 
-        showStatus(statusEl, 'loading', 'Analyzing data and generating transformation...');
+        // ── Phase 1: AI call ────────────────────────────────
+        showStatus(statusEl, 'loading', retryMode
+            ? 'Asking AI to fix the transform function...'
+            : 'Analyzing pattern from sample data...');
         $('#btn-transform').disabled = true;
+        $('#btn-cancel-transform').style.display = '';
+
+        // Cancel any previous in-flight request
+        if (state.abortController) state.abortController.abort();
+        state.abortController = new AbortController();
 
         try {
-            const response = await apiCall('/api/transform', { prompt });
+            var response = await apiCall('/api/transform', { prompt }, state.abortController.signal);
 
-            showStatus(statusEl, 'loading', 'Parsing response...');
+            showStatus(statusEl, 'loading', 'Parsing AI response...');
 
-            let parsed;
+            var parsed;
             try {
-                parsed = parseAIResponse(response.content);
+                parsed = parseTransformResponse(response.content);
             } catch (parseErr) {
                 // Show raw response on parse failure
                 showStatus(statusEl, 'error', 'Failed to parse AI response. Raw response shown below.');
@@ -421,21 +577,73 @@ ${previousScript || '(none provided)'}`;
                 return;
             }
 
-            state.result = parsed;
+            // ── Phase 2: Local execution ────────────────────
+            var transformedData;
 
-            // Show results
-            renderPreview($('#result-preview-container'), parsed.transformedData);
-            $('#result-preview-info').textContent = parsed.transformedData
-                ? `${parsed.transformedData.length} rows × ${(parsed.transformedData[0] || []).length} columns`
+            if (parsed.jsTransform) {
+                // New format: execute JS locally
+                var rowCount = state.inputData.length - 1;
+                showStatus(statusEl, 'loading',
+                    'Applying transformation to ' + rowCount + ' rows...');
+
+                try {
+                    transformedData = await executeJsTransform(parsed.jsTransform, state.inputData);
+                } catch (execErr) {
+                    // Store for retry
+                    state.lastJsTransform = parsed.jsTransform;
+                    state.lastExecError = execErr.message;
+
+                    showStatus(statusEl, 'error',
+                        'Local execution failed: ' + execErr.message);
+                    $('#result-explanation').textContent = parsed.explanation || '';
+                    $('#result-script-code').textContent = parsed.script || '';
+                    $('#result-js-transform-code').textContent = parsed.jsTransform;
+                    $('#js-transform-section').style.display = '';
+                    $('#result-preview-container').innerHTML =
+                        '<div class="empty-state">Transform function failed — see generated code below</div>';
+                    $('#result-preview-info').textContent = '';
+                    resultsEl.classList.add('visible');
+                    $('#btn-retry-transform').style.display = '';
+                    return;
+                }
+            } else if (parsed.transformedData) {
+                // Backward-compatible: AI returned data directly
+                transformedData = parsed.transformedData;
+            } else {
+                showStatus(statusEl, 'error', 'AI did not return a transform function or data.');
+                return;
+            }
+
+            // ── Success ─────────────────────────────────────
+            state.result = {
+                transformedData: transformedData,
+                jsTransform: parsed.jsTransform || null,
+                script: parsed.script,
+                explanation: parsed.explanation
+            };
+            state.lastJsTransform = parsed.jsTransform || null;
+            state.lastExecError = null;
+
+            renderPreview($('#result-preview-container'), transformedData);
+            $('#result-preview-info').textContent = transformedData
+                ? transformedData.length + ' rows \u00d7 ' + (transformedData[0] || []).length + ' columns'
                 : '';
             $('#result-explanation').textContent = parsed.explanation || '';
             $('#result-script-code').textContent = parsed.script || '';
+            if (parsed.jsTransform) {
+                $('#result-js-transform-code').textContent = parsed.jsTransform;
+                $('#js-transform-section').style.display = '';
+            } else {
+                $('#js-transform-section').style.display = 'none';
+            }
             resultsEl.classList.add('visible');
             showStatus(statusEl, 'success', 'Transformation complete!');
         } catch (e) {
             showStatus(statusEl, 'error', e.message || 'Transform failed.');
         } finally {
             $('#btn-transform').disabled = false;
+            $('#btn-cancel-transform').style.display = 'none';
+            state.abortController = null;
         }
     }
 

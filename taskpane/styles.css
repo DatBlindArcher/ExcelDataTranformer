@@ -344,11 +344,23 @@ textarea {
     margin-bottom: 8px;
 }
 
+/* === Transform Actions === */
+.transform-actions {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.transform-actions .btn-full {
+    flex: 1;
+}
+
 /* === Write Options === */
 .write-options {
     display: flex;
     gap: 6px;
     margin-top: 8px;
+    flex-wrap: wrap;
 }
 
 /* === Empty State === */

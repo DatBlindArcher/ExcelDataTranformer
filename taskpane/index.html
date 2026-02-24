@@ -81,7 +81,10 @@
                     <option value="OfficeScripts">Office Scripts (TypeScript)</option>
                 </select>
             </div>
-            <button class="btn btn-primary btn-large btn-full" id="btn-transform">Transform</button>
+            <div class="transform-actions">
+                <button class="btn btn-primary btn-large btn-full" id="btn-transform">Transform</button>
+                <button class="btn btn-secondary btn-large" id="btn-cancel-transform" style="display:none">Cancel</button>
+            </div>
             <div class="status" id="transform-status"></div>
         </div>
 
@@ -95,6 +98,7 @@
                 <div class="write-options">
                     <button class="btn btn-primary btn-small" id="btn-write-new-sheet">Write to New Sheet</button>
                     <button class="btn btn-secondary btn-small" id="btn-write-selection">Write to Selection</button>
+                    <button class="btn btn-secondary btn-small" id="btn-retry-transform" style="display:none">Retry with AI Fix</button>
                 </div>
             </div>
 
@@ -112,6 +116,19 @@
                     <strong>VBA:</strong> Press Alt+F11 → Insert → Module → Paste the code.<br>
                     <strong>Office Scripts:</strong> Open Automate tab → New Script → Paste the code.
                 </p>
+            </div>
+
+            <div class="section" id="js-transform-section" style="display:none">
+                <div class="collapsible-header" id="js-transform-header">
+                    <span class="section-title" style="margin-bottom:0">Generated Transform Function (JS)</span>
+                    <span class="chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-body" id="js-transform-body">
+                    <pre class="code-block" id="result-js-transform-code"></pre>
+                    <p style="font-size:11px;color:#888;margin-top:6px">
+                        This JavaScript function was executed locally to transform your full dataset.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
