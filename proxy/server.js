@@ -119,10 +119,8 @@ async function callAI(provider, apiKey, model, prompt) {
         body = JSON.stringify({
             model: model || 'claude-sonnet-4-20250514',
             max_tokens: 16384,
-            messages: [
-                { role: 'user', content: prompt },
-                { role: 'assistant', content: '{' }   // Prefill forces JSON output
-            ]
+            system: 'You are a JSON-only responder. Output raw JSON with no markdown fences, no commentary, and no extra text. Your entire response must be a single valid JSON object.',
+            messages: [{ role: 'user', content: prompt }]
         });
     } else if (provider === 'openai') {
         url = 'https://api.openai.com/v1/chat/completions';
@@ -133,7 +131,7 @@ async function callAI(provider, apiKey, model, prompt) {
         body = JSON.stringify({
             model: model || 'gpt-4o',
             max_completion_tokens: 16384,
-            response_format: { type: 'json_object' }, // Enforce JSON output
+            response_format: { type: 'json_object' },
             messages: [{ role: 'user', content: prompt }]
         });
     } else {
@@ -162,8 +160,7 @@ async function callAI(provider, apiKey, model, prompt) {
 
     // Normalize response: extract the text content
     if (provider === 'claude') {
-        // Prepend '{' to match the assistant prefill we used to force JSON
-        return '{' + data.content[0].text;
+        return data.content[0].text;
     } else {
         return data.choices[0].message.content;
     }
